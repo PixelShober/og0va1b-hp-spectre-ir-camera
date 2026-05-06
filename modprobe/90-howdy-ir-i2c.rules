@@ -1,0 +1,2 @@
+# Allow the logged-in desktop user to toggle the laptop IR illuminator for Howdy.
+KERNEL=="i2c-2", GROUP="i2c", MODE="0660", TAG+="uaccess"

@@ -1,0 +1,12 @@
+GPL-2.0-only
+
+This repository contains Linux-kernel-derived driver code with SPDX identifiers:
+
+    SPDX-License-Identifier: GPL-2.0
+
+The helper scripts and local integration files in this repository are provided
+under GPL-2.0-only as well, unless a file states otherwise.
+
+For the full GPL-2.0 license text, see:
+
+    https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt

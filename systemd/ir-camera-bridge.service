@@ -1,0 +1,13 @@
+[Unit]
+Description=IR Camera libcamera to v4l2loopback bridge
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ir-camera-bridge.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

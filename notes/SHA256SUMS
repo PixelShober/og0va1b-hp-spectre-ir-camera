@@ -1,0 +1,13 @@
+cf80c471675ab4a3adf9e1e9a9dec5b4bc74faae80b71730dedc2acb1f234e38  og0va1b-hp-spectre-ir-snapshot/driver/Makefile
+be6823facc1c96ed48a67d39313cf997bb4cda358c8489ce08e0c80441ef43a7  og0va1b-hp-spectre-ir-snapshot/driver/dkms.conf
+612af31992972a54b7b273820b9b666fc859359f181761d508fc4c7d30113978  og0va1b-hp-spectre-ir-snapshot/driver/ipu-bridge.c
+5c13dbf10f750c15f2349289025b06720b014be17ef9e1d74efa92198913be09  og0va1b-hp-spectre-ir-snapshot/driver/og0va1b.c
+1ab19b3d582128c12bb444eedc47906eba9978dc4e3715fdc676ae78fb69d39e  og0va1b-hp-spectre-ir-snapshot/bridge/howdy-ir-tuner
+8c34bbc2350789908bc6295b32c1e63324a1ccfeb81b1ea7ffd6c0717c5e6093  og0va1b-hp-spectre-ir-snapshot/bridge/ir-camera-bridge.ini
+88fd00b6d1a8927f6e8fb514775b55df825fd0437742c031e9ca61132bd51c04  og0va1b-hp-spectre-ir-snapshot/bridge/ir-camera-bridge.py
+af8e8ff9bb304a526716c8359f4d84286f8b03c6c9efa70e345a36fe629f3fc3  og0va1b-hp-spectre-ir-snapshot/systemd/ir-camera-bridge.service
+f022ded2fe47dbd208781fcefe3f049dc8d63bdd23724929dbdad08853db4e5b  og0va1b-hp-spectre-ir-snapshot/modprobe/90-howdy-ir-i2c.rules
+b5a53d747422f8b594e3e9615e238457d696732efce94050cdd72182a8645ef2  og0va1b-hp-spectre-ir-snapshot/modprobe/i2c-dev.conf
+a9b2b848502fa3d9456a869f47c9f873e32d0fdf0e2454029cb6679dff087862  og0va1b-hp-spectre-ir-snapshot/modprobe/v4l2loopback.conf
+798775230695a7975104507fcd3cc62dc94628db7e60118c67569f5396989243  og0va1b-hp-spectre-ir-snapshot/howdy/howdy-config.ini
+12f1a47b3a98c2be127274849d0f212b012b6e054d88cc4e860c9a1f441320f1  og0va1b-hp-spectre-ir-snapshot/howdy/video_capture.py

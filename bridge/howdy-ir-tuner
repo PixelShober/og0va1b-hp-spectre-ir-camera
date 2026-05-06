@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""Live tuner for the Howdy IR camera bridge."""
+import configparser
+import os
+import subprocess
+import time
+
+import cv2
+import numpy as np
+
+CONFIG_PATH = "/etc/ir-camera-bridge.ini"
+DEVICE = "/dev/video100"
+
+DEFAULTS = {
+    "ae_enable": True,
+    "ae_constraint_mode": 1,
+    "exposure_value": -1.0,
+    "source_brightness": -0.15,
+    "source_contrast": 1.15,
+    "bridge_brightness": -0.18,
+    "bridge_contrast": 1.25,
+    "ir_torch_current": 0,
+}
+
+WINDOW = "Howdy IR Tuner"
+
+
+def clamp(value, low, high):
+    return max(low, min(high, value))
+
+
+def read_config():
+    parser = configparser.ConfigParser()
+    parser["image"] = {k: str(v).lower() for k, v in DEFAULTS.items()}
+    parser.read(CONFIG_PATH)
+    image = parser["image"]
+    return {
+        "ae_enable": image.getboolean("ae_enable", fallback=True),
+        "ae_constraint_mode": image.getint("ae_constraint_mode", fallback=1),
+        "exposure_value": image.getfloat("exposure_value", fallback=-1.0),
+        "source_brightness": image.getfloat("source_brightness", fallback=-0.15),
+        "source_contrast": image.getfloat("source_contrast", fallback=1.15),
+        "bridge_brightness": image.getfloat("bridge_brightness", fallback=-0.18),
+        "bridge_contrast": image.getfloat("bridge_contrast", fallback=1.25),
+        "ir_torch_current": image.getint("ir_torch_current", fallback=0),
+    }
+
+
+def write_config(settings):
+    parser = configparser.ConfigParser()
+    parser["image"] = {
+        "ae_enable": "true" if settings["ae_enable"] else "false",
+        "ae_constraint_mode": str(settings["ae_constraint_mode"]),
+        "exposure_value": f"{settings['exposure_value']:.2f}",
+        "source_brightness": f"{settings['source_brightness']:.2f}",
+        "source_contrast": f"{settings['source_contrast']:.2f}",
+        "bridge_brightness": f"{settings['bridge_brightness']:.2f}",
+        "bridge_contrast": f"{settings['bridge_contrast']:.2f}",
+        "ir_torch_current": str(settings["ir_torch_current"]),
+    }
+    with open(CONFIG_PATH, "w") as handle:
+        parser.write(handle)
+
+
+def i2c_transfer(*args):
+    try:
+        subprocess.run(
+            ["/usr/bin/i2ctransfer", "-f", "-y", "2", *args],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
+
+
+def lm3643_write(reg, value):
+    return i2c_transfer("w2@0x63", f"0x{reg:02x}", f"0x{value:02x}")
+
+
+def set_torch(current):
+    current = clamp(int(current), 0, 0x7f)
+    i2c_transfer("w1@0x63", "0x0a", "r1")
+    i2c_transfer("w1@0x63", "0x0b", "r1")
+    lm3643_write(0x05, current)
+    lm3643_write(0x06, current)
+    lm3643_write(0x01, 0x0b if current > 0 else 0x00)
+
+
+def slider_to_settings():
+    return {
+        "ae_enable": cv2.getTrackbarPos("AE auto", WINDOW) == 1,
+        "ae_constraint_mode": cv2.getTrackbarPos("AE 0 normal 1 highlight", WINDOW),
+        "exposure_value": cv2.getTrackbarPos("EV -3.0..+1.0", WINDOW) / 10.0 - 3.0,
+        "source_brightness": cv2.getTrackbarPos("Src bright -1..+1", WINDOW) / 100.0 - 1.0,
+        "source_contrast": cv2.getTrackbarPos("Src contrast 0..2", WINDOW) / 100.0,
+        "bridge_brightness": cv2.getTrackbarPos("Out bright -1..+1", WINDOW) / 100.0 - 1.0,
+        "bridge_contrast": cv2.getTrackbarPos("Out contrast 0..2", WINDOW) / 100.0,
+        "ir_torch_current": cv2.getTrackbarPos("IR torch 0..8", WINDOW),
+    }
+
+
+def set_sliders(settings):
+    cv2.setTrackbarPos("AE auto", WINDOW, 1 if settings["ae_enable"] else 0)
+    cv2.setTrackbarPos("AE 0 normal 1 highlight", WINDOW, settings["ae_constraint_mode"])
+    cv2.setTrackbarPos("EV -3.0..+1.0", WINDOW, int(round((settings["exposure_value"] + 3.0) * 10)))
+    cv2.setTrackbarPos("Src bright -1..+1", WINDOW, int(round((settings["source_brightness"] + 1.0) * 100)))
+    cv2.setTrackbarPos("Src contrast 0..2", WINDOW, int(round(settings["source_contrast"] * 100)))
+    cv2.setTrackbarPos("Out bright -1..+1", WINDOW, int(round((settings["bridge_brightness"] + 1.0) * 100)))
+    cv2.setTrackbarPos("Out contrast 0..2", WINDOW, int(round(settings["bridge_contrast"] * 100)))
+    cv2.setTrackbarPos("IR torch 0..8", WINDOW, settings["ir_torch_current"])
+
+
+def noop(_value):
+    pass
+
+
+def overlay_stats(frame, settings):
+    gray = frame if len(frame.shape) == 2 else cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    mean = float(np.mean(gray))
+    p05, p95 = np.percentile(gray, [5, 95])
+    clipped = float(np.mean(gray >= 245) * 100)
+    dark = float(np.mean(gray <= 10) * 100)
+    lines = [
+        f"mean {mean:.0f}  p05 {p05:.0f}  p95 {p95:.0f}",
+        f"clipped {clipped:.1f}%  dark {dark:.1f}%",
+        f"EV {settings['exposure_value']:.1f}  IR {settings['ir_torch_current']}  outC {settings['bridge_contrast']:.2f}",
+        "q/ESC quit, r reset",
+    ]
+    view = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+    for index, line in enumerate(lines):
+        y = 24 + index * 22
+        cv2.putText(view, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 3, cv2.LINE_AA)
+        cv2.putText(view, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
+    return view
+
+
+def main():
+    settings = read_config()
+    cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(WINDOW, 900, 720)
+    cv2.createTrackbar("AE auto", WINDOW, 0, 1, noop)
+    cv2.createTrackbar("AE 0 normal 1 highlight", WINDOW, 0, 1, noop)
+    cv2.createTrackbar("EV -3.0..+1.0", WINDOW, 0, 40, noop)
+    cv2.createTrackbar("Src bright -1..+1", WINDOW, 0, 200, noop)
+    cv2.createTrackbar("Src contrast 0..2", WINDOW, 0, 200, noop)
+    cv2.createTrackbar("Out bright -1..+1", WINDOW, 0, 200, noop)
+    cv2.createTrackbar("Out contrast 0..2", WINDOW, 0, 200, noop)
+    cv2.createTrackbar("IR torch 0..8", WINDOW, 0, 8, noop)
+    set_sliders(settings)
+    write_config(settings)
+    set_torch(settings["ir_torch_current"])
+
+    capture = cv2.VideoCapture(DEVICE, cv2.CAP_V4L2)
+    if not capture.isOpened():
+        raise SystemExit(f"Could not open {DEVICE}")
+
+    last_settings = settings
+    last_write = 0.0
+    try:
+        while True:
+            settings = slider_to_settings()
+            if settings != last_settings and time.time() - last_write > 0.12:
+                write_config(settings)
+                if settings["ir_torch_current"] != last_settings["ir_torch_current"]:
+                    set_torch(settings["ir_torch_current"])
+                last_settings = settings
+                last_write = time.time()
+
+            ok, frame = capture.read()
+            if ok:
+                cv2.imshow(WINDOW, overlay_stats(frame, settings))
+
+            key = cv2.waitKey(20) & 0xFF
+            if key in (27, ord("q")):
+                break
+            if key == ord("r"):
+                settings = DEFAULTS.copy()
+                set_sliders(settings)
+                write_config(settings)
+                set_torch(settings["ir_torch_current"])
+                last_settings = settings
+    finally:
+        capture.release()
+        set_torch(0)
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()

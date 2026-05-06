@@ -1,0 +1,15 @@
+*.o
+*.ko
+*.ko.zst
+*.mod
+*.mod.c
+*.mod.o
+.*.cmd
+Module.symvers
+modules.order
+__pycache__/
+*.pyc
+*.jpg
+*.png
+*.tar
+*.tar.*
